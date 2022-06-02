@@ -51,57 +51,54 @@ box.space.magician_spell:insert({6, 3, 3})
 box.space.magician_spell:insert({7, 3, 4})
 box.space.magician_spell:insert({8, 3, 5})
 
--- Выведем имена всех магов
-local function print_magicians()
-    local magicians = box.space.magician:select()
-    for _, magician in ipairs(magicians) do
-        local name = magician[2]
-        print(name)
+-- Подключим библиотеки, которые понадобятся для логирования
+local log = require('log')
+local json = require('json')
+
+-- Подготовим список магов и названий известных им заклинаний
+local function magicians_spells()
+    local result = {}
+    for _, magician in box.space.magician:pairs() do
+        local magician_table = {
+            id = magician[1],
+            name = magician[2],
+            spells = {}
+        }
+
+        local magician_id = magician[1]
+        local magician_spells = box.space.magician_spell.index.magician_id:select({magician_id})
+        for _, magician_spell in ipairs(magician_spells) do
+            local spell_id = magician_spell[3]
+            local spell = box.space.spell:get{spell_id}
+            table.insert(magician_table.spells, spell)
+        end
+        table.insert(result, magician_table)
     end
+    return result
 end
-print_magicians()
+local magicians_spells_table = magicians_spells()
+log.info('Magicians and list of spells they know: %s', json.encode(magicians_spells_table))
 
--- Выведем названия всех заклинаний с четным id
-local function print_even_id_spells()
-    local spells_amount = box.space.spell:len()
-    for i = 2, spells_amount, 2 do
-        spell = box.space.spell:get{i}
-        local name = spell[2]
-        print(name)
-    end
-end
-print_even_id_spells()
-
-
--- Выведем названия заклинаний, которые знает маг с id = 1
-local function print_spell_by_mag_id(id)
-    if type(id) ~= 'number' then
-        return nil, error('id should be number')
-    end
-    local magician_spells = box.space.magician_spell.index.magician_id:select({id})
-    for _, magician_spell in ipairs(magician_spells) do
-        local spell_id = magician_spell[3]
-        spell = box.space.spell:get{spell_id}
-        local name = spell[2]
-        print(name)
-    end
-end
-print_spell_by_mag_id(1)
-
--- Удалим всех магов, которые не знают ни одно заклинание
+-- Удалим всех магов, которые не знают ни одно заклинание и верни списочек
 local function delete_magicians_without_spells()
+    local result = {}
     for _, magician in box.space.magician:pairs() do
         local magician_id = magician[1]
         local magician_name = magician[2]
         local magician_spells = box.space.magician_spell.index.magician_id:select({magician_id})
         if #magician_spells == 0 then
-            box.space.magician:delete{magician_id}
-            print(magician_name)
+            local magician = box.space.magician:delete{magician_id}
+            table.insert(result, magician)
         end
     end
-
+    return result
 end
-delete_magicians_without_spells()
+local magicians_without_spells = delete_magicians_without_spells()
+log.info('Magicians without spells: %s', json.encode(magicians_without_spells))
 
 -- Переименуем мага с id = 1 в Гарри Поттора
-box.space.magicians:update({1}, {{'=', 'name', 'Harry Potter'}})
+local function rename_magician(id, name)
+    local result = box.space.magician:update({id}, {{'=', 'name', name}})
+    return result
+end
+rename_magician(1, 'Harry Potter')
